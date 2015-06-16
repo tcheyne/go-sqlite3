@@ -46,6 +46,120 @@ _sqlite3_bind_blob(sqlite3_stmt *stmt, int n, void *p, int np) {
 
 #include <stdio.h>
 #include <stdint.h>
+#include <sqlite3.h>
+
+typedef struct CounterCtx CounterCtx;
+struct CounterCtx {
+   uint64_t n;
+};
+
+static void countStepper(sqlite3_context *context, int argc, sqlite3_value **argv){
+   CounterCtx *p;
+   p = sqlite3_aggregate_context(context, sizeof(*p));
+   if ( (argc==0 || SQLITE_NULL!=sqlite3_value_type(argv[0])) && p ){
+     p->n++;
+   }
+}
+
+static void countFinalizer(sqlite3_context *context){
+  CounterCtx *p;
+  p = sqlite3_aggregate_context(context, 0);
+  sqlite3_result_int64(context, p ? p->n : 0);
+}
+
+typedef struct ByteCtx ByteCtx;
+struct ByteCtx {
+  char bytes[4266];
+  uint64_t cnt;
+};
+
+static void bytesSummer(sqlite3_context *context, int argc, sqlite3_value **argv){
+  ByteCtx *p;
+  int type;
+  p = sqlite3_aggregate_context(context, sizeof(*p));
+  type = sqlite3_value_type(argv[0]);
+  if(p && type!=SQLITE_NULL) {
+    p->cnt++;
+    char const *blob = sqlite3_value_blob(argv[0]);
+    int nBytes = sqlite3_value_bytes(argv[0]);
+    if ( blob ) {
+      int i;
+      char c1, c2;
+      short s1, s2, s3;
+      int i1, i2;
+      char* sum = p->bytes;
+      for(i=0; i<nBytes; i+=2){
+        c1 = blob[i];
+        c2 = blob[i+1];
+        s1 = (short)(((unsigned char)c2 << 8) | (unsigned char)c1);
+        c1 = sum[i];
+        c2 = sum[i+1];
+        s2 = (short)(((unsigned char)c2 << 8) | (unsigned char)c1);
+        s3 = s1+s2;
+        i1 = s3;
+        c2 = s3 >> 8;
+        sum[i] = c1;
+        sum[i+1] = c2;
+      }
+    }
+  }
+}
+
+static void bytesFinalizer(sqlite3_context *context){
+  ByteCtx *p;
+  p = sqlite3_aggregate_context(context, 0);
+  sqlite3_result_blob(context, p->bytes, 4266, SQLITE_TRANSIENT);
+}
+
+static int callback(void *NotUsed, int argc, char **argv, char **azColName){
+  NotUsed=0;
+  int i;
+  for(i=0; i<argc; i++){
+    printf("%s = %s\n", azColName[i], argv[i] ? argv[i]: "NULL");
+  }
+  printf("\n");
+  return 0;
+}
+
+int main(int argc, char **argv){
+  sqlite3 *db;
+  char *zErrMsg = 0;
+  int rc;
+
+  if( argc!=3 ){
+    fprintf(stderr, "Usage: %s DATABASE SQL-STATEMENT\n", argv[0]);
+    exit(1);
+  }
+  rc = sqlite3_open(argv[1], &db);
+  if( rc ){
+    fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+    sqlite3_close(db);
+    exit(1);
+  }
+
+  char *zFunctionName = "MYCOUNT";
+  int *ptr=NULL;
+  void *ptr2=NULL;
+  void (*xStep)(sqlite3_context*,int,sqlite3_value**) = countStepper;
+  void (*xFinal)(sqlite3_context*) = countFinalizer;
+
+  char *yFunctionName = "BYTESUM";
+  void (*yStep)(sqlite3_context*,int,sqlite3_value**) = bytesSummer;
+  void (*yFinal)(sqlite3_context*) = bytesFinalizer;
+
+
+  int val = sqlite3_create_function(db,zFunctionName,1,SQLITE_UTF16LE,ptr,ptr2,xStep,xFinal);
+  int val2 = sqlite3_create_function(db,yFunctionName,1,SQLITE_UTF16LE,ptr,ptr2,yStep,yFinal);
+
+  rc = sqlite3_exec(db, argv[2], callback, 0, &zErrMsg);
+    if( rc!=SQLITE_OK ){
+      fprintf(stderr, "SQL error: %s\n", zErrMsg);
+      if (zErrMsg)
+         free(zErrMsg);
+      }
+    sqlite3_close(db);
+    return 0;
+}
 
 static int
 _sqlite3_exec(sqlite3* db, const char* pcmd, long* rowid, long* changes)
