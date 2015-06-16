@@ -46,7 +46,6 @@ _sqlite3_bind_blob(sqlite3_stmt *stmt, int n, void *p, int np) {
 
 #include <stdio.h>
 #include <stdint.h>
-#include <sqlite3.h>
 
 typedef struct CounterCtx CounterCtx;
 struct CounterCtx {
