@@ -111,31 +111,9 @@ static void bytesFinalizer(sqlite3_context *context){
   sqlite3_result_blob(context, p->bytes, 4266, SQLITE_TRANSIENT);
 }
 
-static int callback(void *NotUsed, int argc, char **argv, char **azColName){
-  NotUsed=0;
-  int i;
-  for(i=0; i<argc; i++){
-    printf("%s = %s\n", azColName[i], argv[i] ? argv[i]: "NULL");
-  }
-  printf("\n");
-  return 0;
-}
 
-int build(int argc, char **argv){
-  sqlite3 *db;
-  char *zErrMsg = 0;
-  int rc;
-
-  if( argc!=3 ){
-    fprintf(stderr, "Usage: %s DATABASE SQL-STATEMENT\n", argv[0]);
-    exit(1);
-  }
-  rc = sqlite3_open(argv[1], &db);
-  if( rc ){
-    fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
-    sqlite3_close(db);
-    exit(1);
-  }
+static void
+_addFunc(sqlite3 *db){
 
   char *zFunctionName = "MYCOUNT";
   int *ptr=NULL;
@@ -150,15 +128,6 @@ int build(int argc, char **argv){
 
   int val = sqlite3_create_function(db,zFunctionName,1,SQLITE_UTF16LE,ptr,ptr2,xStep,xFinal);
   int val2 = sqlite3_create_function(db,yFunctionName,1,SQLITE_UTF16LE,ptr,ptr2,yStep,yFinal);
-
-  rc = sqlite3_exec(db, argv[2], callback, 0, &zErrMsg);
-    if( rc!=SQLITE_OK ){
-      fprintf(stderr, "SQL error: %s\n", zErrMsg);
-      if (zErrMsg)
-         free(zErrMsg);
-      }
-    sqlite3_close(db);
-    return 0;
 }
 
 static int
@@ -466,6 +435,7 @@ func (d *SQLiteDriver) Open(dsn string) (driver.Conn, error) {
 		return nil, Error{Code: ErrNo(rv)}
 	}
 
+	C._addFunc(db)
 	conn := &SQLiteConn{db: db, loc: loc, txlock: txlock}
 
 	if len(d.Extensions) > 0 {
