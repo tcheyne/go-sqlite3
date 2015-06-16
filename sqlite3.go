@@ -121,7 +121,7 @@ static int callback(void *NotUsed, int argc, char **argv, char **azColName){
   return 0;
 }
 
-int main(int argc, char **argv){
+int build(int argc, char **argv){
   sqlite3 *db;
   char *zErrMsg = 0;
   int rc;
