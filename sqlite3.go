@@ -46,6 +46,7 @@ _sqlite3_bind_blob(sqlite3_stmt *stmt, int n, void *p, int np) {
 
 #include <stdio.h>
 #include <stdint.h>
+#include <sqlite3.h>
 
 typedef struct CounterCtx CounterCtx;
 struct CounterCtx {
@@ -82,12 +83,10 @@ static void bytesSummer(sqlite3_context *context, int argc, sqlite3_value **argv
     char const *blob = sqlite3_value_blob(argv[0]);
     int nBytes = sqlite3_value_bytes(argv[0]);
     if ( blob ) {
-      int i;
       char c1, c2;
       short s1, s2, s3;
-      int i1, i2;
       char* sum = p->bytes;
-      for(i=0; i<nBytes; i+=2){
+      for(int i=0; i<nBytes; i+=2){
         c1 = blob[i];
         c2 = blob[i+1];
         s1 = (short)(((unsigned char)c2 << 8) | (unsigned char)c1);
@@ -95,7 +94,7 @@ static void bytesSummer(sqlite3_context *context, int argc, sqlite3_value **argv
         c2 = sum[i+1];
         s2 = (short)(((unsigned char)c2 << 8) | (unsigned char)c1);
         s3 = s1+s2;
-        i1 = s3;
+        c1 = s3;
         c2 = s3 >> 8;
         sum[i] = c1;
         sum[i+1] = c2;
